@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>GCam Web Clone</title>
+    <style>
+        :root {
+            --bg-color: #000000;
+            --overlay-bg: rgba(18, 18, 18, 0.75);
+            --accent-blue: #A8C7FA;
+            --accent-red: #EA4335;
+            --text-primary: #FFFFFF;
+            --text-secondary: rgba(255, 255, 255, 0.6);
+            --shutter-ring: rgba(255, 255, 255, 0.3);
+        }
+
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            font-family: 'Roboto', 'Inter', system-ui, -apple-system, sans-serif;
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* --- ВЕРХНЯЯ ПАНЕЛЬ --- */
+        .top-bar {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 60px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 20px;
+            z-index: 10;
+            background: linear-gradient(to bottom, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0) 100%);
+        }
+
+        .icon-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .icon-btn:active {
+            transform: scale(0.9);
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .icon-btn svg {
+            width: 20px;
+            height: 20px;
+            fill: var(--text-primary);
+        }
+
+        .top-center {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .top-center svg {
+            width: 16px;
+            height: 16px;
+            fill: var(--text-primary);
+        }
+
+        /* --- ЗОНА ВИДОИСКАТЕЛЯ --- */
+        .viewport-container {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            position: relative;
+        }
+
+        .viewport {
+            width: 100%;
+            max-width: 400px;
+            aspect-ratio: 3/4;
+            background: #111;
+            border-radius: 28px;
+            overflow: hidden;
+            position: relative;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+
+        /* Скрываем оригинальное видео, показываем только Canvas */
+        #video-source {
+            display: none;
+        }
+
+        #camera-canvas {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transform: scaleX(1); /* Для зеркалирования фронталки */
+        }
+
+        .camera-switch-anim {
+            animation: flip 0.3s ease-in-out;
+        }
+
+        @keyframes flip {
+            0% { transform: scaleX(1) rotateY(0deg); }
+            50% { transform: scaleX(1) rotateY(90deg); }
+            100% { transform: scaleX(1) rotateY(0deg); }
+        }
+
+        /* --- ЗУМ --- */
+        .zoom-controls {
+            position: absolute;
+            bottom: 180px; /* Над нижней панелью */
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 12px;
+            background: var(--overlay-bg);
+            backdrop-filter: blur(12px);
+            padding: 6px 8px;
+            border-radius: 24px;
+            z-index: 10;
+        }
+
+        .zoom-tab {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .zoom-tab.active {
+            background-color: var(--text-primary);
+            color: #000;
+            font-weight: 700;
+        }
+
+        .zoom-tab:active {
+            transform: scale(0.9);
+        }
+
+        /* --- ЛЕНТА РЕЖИМОВ --- */
+        .mode-selector {
+            position: absolute;
+            bottom: 110px;
+            left: 0;
+            right: 0;
+            display: flex;
+            justify-content: center;
+            overflow-x: auto;
+            gap: 24px;
+            padding: 10px 20px;
+            scrollbar-width: none; /* Firefox */
+            z-index: 10;
+        }
+        .mode-selector::-webkit-scrollbar { display: none; }
+
+        .mode-item {
+            font-size: 15px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            white-space: nowrap;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            padding: 4px 8px;
+            border-radius: 12px;
+        }
+
+        .mode-item.active {
+            color: var(--text-primary);
+            font-weight: 700;
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        /* --- НИЖНЯЯ ПАНЕЛЬ УПРАВЛЕНИЯ --- */
+        .bottom-controls {
+            height: 100px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 40px;
+            position: relative;
+            z-index: 10;
+            background: linear-gradient(to top, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0) 100%);
+        }
+
+        /* Галерея */
+        .gallery-preview {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            background: #333;
+            border: 2px solid rgba(255,255,255,0.2);
+            overflow: hidden;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+        .gallery-preview:active { transform: scale(0.9); }
+        .gallery-preview img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        /* Затвор (Shutter) */
+        .shutter-container {
+            width: 72px;
+            height: 72px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: transform 0.1s ease;
+        }
+
+        .shutter-container:active {
+            transform: scale(0.9);
+        }
+
+        .shutter-outer {
+            width: 68px;
+            height: 68px;
+            border-radius: 50%;
+            border: 4px solid var(--text-primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+        }
+
+        .shutter-inner {
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background-color: var(--text-primary);
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        /* Стили для режима ВИДЕО */
+        .mode-video .shutter-outer {
+            border-color: var(--text-primary);
+        }
+        .mode-video .shutter-inner {
+            background-color: var(--accent-red);
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+        }
+
+        /* Стили для ЗАПИСИ */
+        .is-recording .shutter-inner {
+            width: 28px;
+            height: 28px;
+            border-radius: 6px; /* Квадрат с легким скруглением */
+            background-color: var(--accent-red);
+        }
+        
+        .is-recording .shutter-outer {
+            border-color: var(--accent-red);
+        }
+
+        /* Кнопка смены камеры */
+        .switch-cam-btn {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(10px);
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .switch-cam-btn:active { transform: scale(0.9) rotate(180deg); }
+        .switch-cam-btn svg {
+            width: 24px;
+            height: 24px;
+            fill: var(--text-primary);
+        }
+
+        /* Индикатор записи */
+        .recording-indicator {
+            position: absolute;
+            top: 80px;
+            right: 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(0,0,0,0.6);
+            padding: 6px 12px;
+            border-radius: 16px;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            pointer-events: none;
+        }
+        .recording-indicator.visible { opacity: 1; }
+        .rec-dot {
+            width: 8px;
+            height: 8px;
+            background: var(--accent-red);
+            border-radius: 50%;
+            animation: pulse 1s infinite;
+        }
+        .rec-timer { font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.4; }
+            100% { opacity: 1; }
+        }
+
+        /* Уведомление о разрешениях */
+        .permission-denied {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: var(--text-secondary);
+            padding: 20px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Верхняя панель -->
+    <div class="top-bar">
+        <button class="icon-btn" aria-label="Настройки">
+            <svg viewBox="0 0 24 24"><path d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.07-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.74,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.07,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.44-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.47-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"/></svg>
+        </button>
+        <div class="top-center">
+            <svg viewBox="0 0 24 24"><path d="M7.41,8.58L12,13.17l4.59-4.59L18,10l-6,6l-6-6L7.41,8.58z"/></svg>
+        </div>
+        <div style="width: 40px;"></div> <!-- Пустой блок для баланса -->
+    </div>
+
+    <!-- Индикатор записи -->
+    <div class="recording-indicator" id="recIndicator">
+        <div class="rec-dot"></div>
+        <div class="rec-timer" id="recTimer">00:00</div>
+    </div>
+
+    <!-- Зона видоискателя -->
+    <div class="viewport-container">
+        <div class="viewport" id="viewport">
+            <video id="video-source" autoplay playsinline muted></video>
+            <canvas id="camera-canvas"></canvas>
+            <div class="permission-denied" id="permDenied">
+                <p>Нет доступа к камере.</p>
+                <p style="font-size: 12px; margin-top: 8px;">Разрешите доступ в настройках браузера.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Зум -->
+    <div class="zoom-controls">
+        <div class="zoom-tab" data-zoom="0.6" onclick="setZoom(0.6)">.6</div>
+        <div class="zoom-tab active" data-zoom="1" onclick="setZoom(1)">1×</div>
+        <div class="zoom-tab" data-zoom="2" onclick="setZoom(2)">2×</div>
+    </div>
+
+    <!-- Режимы -->
+    <div class="mode-selector" id="modeSelector">
+        <div class="mode-item" onclick="setMode('night')">Ночная съемка</div>
+        <div class="mode-item" onclick="setMode('portrait')">Портрет</div>
+        <div class="mode-item active" onclick="setMode('photo')">Камера</div>
+        <div class="mode-item" onclick="setMode('video')">Видео</div>
+    </div>
+
+    <!-- Нижняя панель -->
+    <div class="bottom-controls" id="bottomControls">
+        <div class="gallery-preview" id="galleryPreview">
+            <!-- Здесь будет превью -->
+        </div>
+
+        <div class="shutter-container" id="shutterBtn" onclick="handleShutter()">
+            <div class="shutter-outer">
+                <div class="shutter-inner"></div>
+            </div>
+        </div>
+
+        <button class="switch-cam-btn" onclick="switchCamera()">
+            <svg viewBox="0 0 24 24"><path d="M20,4h-3.17L15,2H9L7.17,4H4C2.9,4,2,4.9,2,6v12c0,1.1,0.9,2,2,2h16c1.1,0,2-0.9,2-2V6C22,4.9,21.1,4,20,4z M12,17 c-2.76,0-5-2.24-5-5s2.24-5,5-5s5,2.24,5,5S14.76,17,12,17z M12,9c-1.66,0-3,1.34-3,3s1.34,3,3,3s3-1.34,3-3S13.66,9,12,9z M15.48,7.53 l-1.41,1.41C13.41,8.34,12.71,8,12,8c-1.1,0-2,0.9-2,2h2c0-0.55,0.45-1,1-1c0.28,0,0.53,0.11,0.71,0.29l1.41-1.41 C14.71,7.47,14.19,7.53,15.48,7.53z"/></svg>
+        </button>
+    </div>
+
+    <script>
+        // --- КОНФИГУРАЦИЯ И СОСТОЯНИЕ ---
+        const state = {
+            mode: 'photo', // 'photo', 'video', 'portrait', 'night'
+            zoom: 1,       // 0.6, 1, 2
+            facingMode: 'environment', // 'user' или 'environment'
+            isRecording: false,
+            stream: null,
+            mediaRecorder: null,
+            recordedChunks: [],
+            recordingStartTime: 0,
+            recordingTimerInterval: null,
+            wideStream: null, // Для попытки загрузки ультраширика
+            animationId: null
+        };
+
+        // --- DOM ЭЛЕМЕНТЫ ---
+        const video = document.getElementById('video-source');
+        const canvas = document.getElementById('camera-canvas');
+        const ctx = canvas.getContext('2d', { alpha: false }); // Оптимизация
+        const shutterBtn = document.getElementById('shutterBtn');
+        const bottomControls = document.getElementById('bottomControls');
+        const recIndicator = document.getElementById('recIndicator');
+        const recTimer = document.getElementById('recTimer');
+        const galleryPreview = document.getElementById('galleryPreview');
+        const permDenied = document.getElementById('permDenied');
+
+        // --- ИНИЦИАЛИЗАЦИЯ ---
+        async function initCamera() {
+            try {
+                // Останавливаем предыдущие стримы
+                if (state.stream) {
+                    state.stream.getTracks().forEach(track => track.stop());
+                }
+
+                // Пытаемся получить камеру
+                const constraints = {
+                    video: {
+                        facingMode: state.facingMode,
+                        width: { ideal: 1920 },
+                        height: { ideal: 1080 }
+                    },
+                    audio: state.mode === 'video'
+                };
+
+                state.stream = await navigator.mediaDevices.getUserMedia(constraints);
+                video.srcObject = state.stream;
+                
+                // Ждем метаданных видео для настройки Canvas
+                video.onloadedmetadata = () => {
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    permDenied.style.display = 'none';
+                    startDrawingLoop();
+                };
+
+                // Попытка инициализировать "широкоугольную" камеру для зума 0.6x
+                // Это эвристика: ищем камеру с "wide" или "ultrawide" в label, или просто вторую заднюю камеру
+                if (state.facingMode === 'environment' && !state.wideStream) {
+                    initWideCamera();
+                }
+
+            } catch (err) {
+                console.error("Ошибка доступа к камере:", err);
+                permDenied.style.display = 'block';
+            }
+        }
+
+        async function initWideCamera() {
+            try {
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const videoDevices = devices.filter(d => d.kind === 'videoinput');
+                
+                // Ищем устройство, которое может быть широкоугольным (эвристика по названию или просто второе)
+                // В реальности веб-API не дает надежного способа выбрать именно "ultrawide", 
+                // поэтому мы берем второй доступный 'environment' если он есть.
+                const backCameras = videoDevices.filter(d => 
+                    (d.label.toLowerCase().includes('back') || d.label.toLowerCase().includes('environment') || d.label.toLowerCase().includes('задняя'))
+                );
+                
+                if (backCameras.length > 1) {
+                    const wideConstraints = {
+                        video: { deviceId: backCameras[1].deviceId }
+                    };
+                    state.wideStream = await navigator.mediaDevices.getUserMedia(wideConstraints);
+                }
+            } catch (e) {
+                console.log("Широкоугольная камера не найдена или недоступна. Будет использована цифровая симуляция.");
+            }
+        }
+
+        // --- ЛОГИКА ОТРИСОВКИ НА CANVAS (ЯДРО GCam) ---
+        function startDrawingLoop() {
+            if (state.animationId) cancelAnimationFrame(state.animationId);
+
+            function draw() {
+                if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                    const vw = video.videoWidth;
+                    const vh = video.videoHeight;
+                    
+                    // Очистка
+                    ctx.fillStyle = '#000';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                    if (state.zoom === 1) {
+                        // 1x: Полное изображение
+                        // Зеркалирование для фронталки
+                        if (state.facingMode === 'user') {
+                            ctx.save();
+                            ctx.scale(-1, 1);
+                            ctx.drawImage(video, -canvas.width, 0, canvas.width, canvas.height);
+                            ctx.restore();
+                        } else {
+                            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                        }
+                    } 
+                    else if (state.zoom === 2) {
+                        // 2x: Цифровой кроп центральной части (электронный зум)
+                        const cropW = vw / 2;
+                        const cropH = vh / 2;
+                        const cropX = (vw - cropW) / 2;
+                        const cropY = (vh - cropH) / 2;
+
+                        if (state.facingMode === 'user') {
+                            ctx.save();
+                            ctx.scale(-1, 1);
+                            ctx.drawImage(video, -cropX, cropY, cropW, cropH, 0, 0, canvas.width, canvas.height);
+                            ctx.restore();
+                        } else {
+                            ctx.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, canvas.width, canvas.height);
+                        }
+                    } 
+                    else if (state.zoom === 0.6) {
+                        // 0.6x: Логика переключения или симуляции
+                        if (state.wideStream && state.facingMode === 'environment') {
+                            // Если нашли реальную широкую камеру, рисуем её (нужен отдельный video элемент, 
+                            // но для простоты в этом демо мы используем цифровую симуляцию "отдаления" 
+                            // через масштабирование контекста, так как переключение стримов на лету в один canvas сложно синхронизировать без мерцания)
+                            
+                            // Симуляция 0.6x: рисуем изображение меньшего размера по центру, создавая эффект "широкого угла" с черными полями 
+                            // (или можно растянуть, но это исказит. GCam на вебе без нативных API линз ограничен).
+                            // Лучший вариант для демо: уменьшить масштаб отрисовки.
+                            const scale = 0.6;
+                            const drawW = canvas.width * scale;
+                            const drawH = canvas.height * scale;
+                            const drawX = (canvas.width - drawW) / 2;
+                            const drawY = (canvas.height - drawH) / 2;
+
+                            if (state.facingMode === 'user') {
+                                ctx.save();
+                                ctx.translate(canvas.width, 0);
+                                ctx.scale(-1, 1);
+                                ctx.drawImage(video, drawX, drawY, drawW, drawH);
+                                ctx.restore();
+                            } else {
+                                ctx.drawImage(video, drawX, drawY, drawW, drawH);
+                            }
+                        } else {
+                            // Фоллбэк для фронталки или если нет второй камеры
+                            const scale = 0.6;
+                            const drawW = canvas.width * scale;
+                            const drawH = canvas.height * scale;
+                            const drawX = (canvas.width - drawW) / 2;
+                            const drawY = (canvas.height - drawH) / 2;
+                            
+                            if (state.facingMode === 'user') {
+                                ctx.save();
+                                ctx.translate(canvas.width, 0);
+                                ctx.scale(-1, 1);
+                                ctx.drawImage(video, drawX, drawY, drawW, drawH);
+                                ctx.restore();
+                            } else {
+                                ctx.drawImage(video, drawX, drawY, drawW, drawH);
+                            }
+                        }
+                    }
+                }
+                state.animationId = requestAnimationFrame(draw);
+            }
+            draw();
+        }
+
+        // --- УПРАВЛЕНИЕ ЗУМОМ ---
+        function setZoom(level) {
+            state.zoom = level;
+            // Обновление UI
+            document.querySelectorAll('.zoom-tab').forEach(tab => {
+                tab.classList.remove('active');
+                if (parseFloat(tab.dataset.zoom) === level) {
+                    tab.classList.add('active');
+                }
+            });
+            // Перезапуск отрисовки не требуется, цикл подхватит state.zoom
+        }
+
+        // --- УПРАВЛЕНИЕ РЕЖИМАМИ ---
+        function setMode(newMode) {
+            state.mode = newMode;
+            
+            // UI Обновление
+            document.querySelectorAll('.mode-item').forEach(item => {
+                item.classList.remove('active');
+                if (item.textContent.toLowerCase().includes(newMode === 'photo' ? 'камера' : newMode === 'video' ? 'видео' : newMode)) {
+                    item.classList.add('active');
+                }
+            });
+
+            // Изменение стиля затвора
+            bottomControls.classList.remove('mode-video', 'is-recording');
+            if (newMode === 'video') {
+                bottomControls.classList.add('mode-video');
+            }
+
+            // Если перешли в видео, убедимся что аудио разрешено (перезапуск стрима)
+            if (newMode === 'video' && (!state.stream || !state.stream.getAudioTracks().length)) {
+                initCamera();
+            }
+        }
+
+        // --- СМЕНА КАМЕРЫ ---
+        async function switchCamera() {
+            state.facingMode = state.facingMode === 'environment' ? 'user' : 'environment';
+            
+            // Анимация
+            canvas.classList.add('camera-switch-anim');
+            setTimeout(() => canvas.classList.remove('camera-switch-anim'), 300);
+
+            await initCamera();
+        }
+
+        // --- ОБРАБОТКА ЗАТВОРА ---
+        function handleShutter() {
+            if (state.mode === 'video') {
+                if (state.isRecording) {
+                    stopRecording();
+                } else {
+                    startRecording();
+                }
+            } else {
+                takePhoto();
+            }
+        }
+
+        function takePhoto() {
+            // Анимация нажатия
+            shutterBtn.style.transform = 'scale(0.9)';
+            setTimeout(() => shutterBtn.style.transform = 'scale(1)', 100);
+
+            // Создаем снимок из Canvas
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+            
+            // Обновляем галерею
+            galleryPreview.innerHTML = `<img src="${dataUrl}" alt="Last photo">`;
+            
+            // Вибрация (если поддерживается)
+            if (navigator.vibrate) navigator.vibrate(50);
+        }
+
+        function startRecording() {
+            state.isRecording = true;
+            bottomControls.classList.add('is-recording');
+            recIndicator.classList.add('visible');
+            
+            // Получаем поток с Canvas (30 FPS)
+            const canvasStream = canvas.captureStream(30);
+            
+            // Добавляем аудио с оригинального стрима, если есть
+            if (state.stream.getAudioTracks().length > 0) {
+                canvasStream.addTrack(state.stream.getAudioTracks()[0]);
+            }
+
+            state.recordedChunks = [];
+            // Предпочтительные кодеки
+            const options = { mimeType: 'video/webm;codecs=vp9' };
+            if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+                options.mimeType = 'video/webm'; // Фоллбэк
+            }
+
+            state.mediaRecorder = new MediaRecorder(canvasStream, options);
+
+            state.mediaRecorder.ondataavailable = (event) => {
+                if (event.data.size > 0) {
+                    state.recordedChunks.push(event.data);
+                }
+            };
+
+            state.mediaRecorder.onstop = () => {
+                const blob = new Blob(state.recordedChunks, { type: 'video/webm' });
+                const url = URL.createObjectURL(blob);
+                galleryPreview.innerHTML = `<video src="${url}" style="width:100%; height:100%; object-fit:cover;"></video>`;
+            };
+
+            state.mediaRecorder.start();
+            state.recordingStartTime = Date.now();
+            
+            // Таймер
+            state.recordingTimerInterval = setInterval(() => {
+                const diff = Math.floor((Date.now() - state.recordingStartTime) / 1000);
+                const mins = Math.floor(diff / 60).toString().padStart(2, '0');
+                const secs = (diff % 60).toString().padStart(2, '0');
+                recTimer.textContent = `${mins}:${secs}`;
+            }, 1000);
+        }
+
+        function stopRecording() {
+            state.isRecording = false;
+            bottomControls.classList.remove('is-recording');
+            recIndicator.classList.remove('visible');
+            
+            if (state.mediaRecorder && state.mediaRecorder.state !== 'inactive') {
+                state.mediaRecorder.stop();
+            }
+            clearInterval(state.recordingTimerInterval);
+            recTimer.textContent = '00:00';
+        }
+
+        // --- ЗАПУСК ---
+        window.addEventListener('load', () => {
+            initCamera();
+        });
+
+        // Обработка изменения размера окна
+        window.addEventListener('resize', () => {
+            if (video.videoWidth) {
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+            }
+        });
+
+    </script>
+</body>
+</html>
