@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>GCam Web Clone</title>
+    <title>GCam Web Pro</title>
     <style>
         :root {
             --bg-color: #000000;
@@ -12,376 +12,215 @@
             --accent-red: #EA4335;
             --text-primary: #FFFFFF;
             --text-secondary: rgba(255, 255, 255, 0.6);
-            --shutter-ring: rgba(255, 255, 255, 0.3);
         }
 
-        * {
-            box-sizing: border-box;
-            -webkit-tap-highlight-color: transparent;
-            user-select: none;
-        }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
 
         body {
-            margin: 0;
-            padding: 0;
-            background-color: var(--bg-color);
-            color: var(--text-primary);
+            margin: 0; padding: 0; background-color: var(--bg-color); color: var(--text-primary);
             font-family: 'Roboto', 'Inter', system-ui, -apple-system, sans-serif;
-            height: 100vh;
-            width: 100vw;
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
+            height: 100vh; width: 100vw; overflow: hidden; display: flex; flex-direction: column;
         }
+
+        /* --- ЭКРАН ЗАПРОСА РАЗРЕШЕНИЙ --- */
+        #start-screen {
+            position: absolute; inset: 0; background: #000; z-index: 100;
+            display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px;
+        }
+        .start-btn {
+            padding: 16px 32px; background: var(--accent-blue); color: #000; border: none;
+            border-radius: 24px; font-size: 16px; font-weight: 700; cursor: pointer;
+            box-shadow: 0 4px 15px rgba(168, 199, 250, 0.3); transition: transform 0.2s;
+        }
+        .start-btn:active { transform: scale(0.95); }
 
         /* --- ВЕРХНЯЯ ПАНЕЛЬ --- */
         .top-bar {
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 60px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 0 20px;
-            z-index: 10;
-            background: linear-gradient(to bottom, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0) 100%);
+            position: absolute; top: 0; left: 0; right: 0; height: 60px;
+            display: flex; justify-content: space-between; align-items: center; padding: 0 20px;
+            z-index: 10; background: linear-gradient(to bottom, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0) 100%);
         }
-
         .icon-btn {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(10px);
-            border: none;
-            cursor: pointer;
-            transition: all 0.2s ease;
+            width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px); border: none; cursor: pointer;
         }
-
-        .icon-btn:active {
-            transform: scale(0.9);
-            background: rgba(255, 255, 255, 0.2);
-        }
-
-        .icon-btn svg {
-            width: 20px;
-            height: 20px;
-            fill: var(--text-primary);
-        }
-
-        .top-center {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 4px;
-        }
-
-        .top-center svg {
-            width: 16px;
-            height: 16px;
-            fill: var(--text-primary);
-        }
+        .icon-btn svg { width: 22px; height: 22px; fill: var(--text-primary); }
 
         /* --- ЗОНА ВИДОИСКАТЕЛЯ --- */
         .viewport-container {
-            flex: 1;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-            position: relative;
+            flex: 1; display: flex; align-items: center; justify-content: center;
+            position: relative; width: 100%;
         }
-
         .viewport {
-            width: 100%;
-            max-width: 400px;
-            aspect-ratio: 3/4;
-            background: #111;
-            border-radius: 28px;
-            overflow: hidden;
-            position: relative;
+            background: #111; overflow: hidden; position: relative;
             box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
         }
+        /* Соотношения сторон для режимов */
+        .viewport.ratio-4-3 { aspect-ratio: 4/3; width: 100%; max-width: 500px; }
+        .viewport.ratio-16-9 { aspect-ratio: 16/9; width: 100%; max-width: 600px; }
+        .viewport.ratio-9-16 { aspect-ratio: 9/16; height: 80vh; max-height: 600px; }
 
-        /* Скрываем оригинальное видео, показываем только Canvas */
-        #video-source {
-            display: none;
-        }
+        #video-source { display: none; }
+        #camera-canvas { width: 100%; height: 100%; object-fit: cover; display: block; }
 
-        #camera-canvas {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            transform: scaleX(1); /* Для зеркалирования фронталки */
+        /* Сетка */
+        .grid-overlay {
+            position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity 0.3s;
+            background-image: 
+                linear-gradient(to right, rgba(255,255,255,0.3) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(255,255,255,0.3) 1px, transparent 1px);
+            background-size: 33.33% 33.33%;
         }
-
-        .camera-switch-anim {
-            animation: flip 0.3s ease-in-out;
-        }
-
-        @keyframes flip {
-            0% { transform: scaleX(1) rotateY(0deg); }
-            50% { transform: scaleX(1) rotateY(90deg); }
-            100% { transform: scaleX(1) rotateY(0deg); }
-        }
+        .grid-overlay.visible { opacity: 1; }
 
         /* --- ЗУМ --- */
         .zoom-controls {
-            position: absolute;
-            bottom: 180px; /* Над нижней панелью */
-            left: 50%;
-            transform: translateX(-50%);
-            display: flex;
-            gap: 12px;
-            background: var(--overlay-bg);
-            backdrop-filter: blur(12px);
-            padding: 6px 8px;
-            border-radius: 24px;
-            z-index: 10;
+            position: absolute; bottom: 170px; left: 50%; transform: translateX(-50%);
+            display: flex; gap: 12px; background: var(--overlay-bg); backdrop-filter: blur(12px);
+            padding: 6px 8px; border-radius: 24px; z-index: 10;
         }
-
         .zoom-tab {
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 14px;
-            font-weight: 500;
-            color: var(--text-secondary);
-            cursor: pointer;
-            transition: all 0.2s ease;
+            width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            font-size: 14px; font-weight: 500; color: var(--text-secondary); cursor: pointer; transition: all 0.2s;
         }
-
-        .zoom-tab.active {
-            background-color: var(--text-primary);
-            color: #000;
-            font-weight: 700;
-        }
-
-        .zoom-tab:active {
-            transform: scale(0.9);
-        }
+        .zoom-tab.active { background-color: var(--text-primary); color: #000; font-weight: 700; }
 
         /* --- ЛЕНТА РЕЖИМОВ --- */
         .mode-selector {
-            position: absolute;
-            bottom: 110px;
-            left: 0;
-            right: 0;
-            display: flex;
-            justify-content: center;
-            overflow-x: auto;
-            gap: 24px;
-            padding: 10px 20px;
-            scrollbar-width: none; /* Firefox */
-            z-index: 10;
+            position: absolute; bottom: 100px; left: 0; right: 0; display: flex;
+            justify-content: center; overflow-x: auto; gap: 24px; padding: 10px 20px;
+            scrollbar-width: none; z-index: 10;
         }
         .mode-selector::-webkit-scrollbar { display: none; }
-
         .mode-item {
-            font-size: 15px;
-            font-weight: 500;
-            color: var(--text-secondary);
-            white-space: nowrap;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            padding: 4px 8px;
-            border-radius: 12px;
+            font-size: 15px; font-weight: 500; color: var(--text-secondary); white-space: nowrap;
+            cursor: pointer; transition: all 0.2s; padding: 4px 8px; border-radius: 12px;
         }
+        .mode-item.active { color: var(--accent-blue); font-weight: 700; }
 
-        .mode-item.active {
-            color: var(--text-primary);
-            font-weight: 700;
-            background: rgba(255, 255, 255, 0.1);
-        }
-
-        /* --- НИЖНЯЯ ПАНЕЛЬ УПРАВЛЕНИЯ --- */
+        /* --- НИЖНЯЯ ПАНЕЛЬ --- */
         .bottom-controls {
-            height: 100px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 0 40px;
-            position: relative;
-            z-index: 10;
-            background: linear-gradient(to top, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0) 100%);
+            height: 100px; display: flex; align-items: center; justify-content: space-between;
+            padding: 0 40px; position: relative; z-index: 10;
         }
-
-        /* Галерея */
         .gallery-preview {
-            width: 48px;
-            height: 48px;
-            border-radius: 12px;
-            background: #333;
-            border: 2px solid rgba(255,255,255,0.2);
-            overflow: hidden;
-            cursor: pointer;
-            transition: transform 0.2s ease;
+            width: 48px; height: 48px; border-radius: 12px; background: #333;
+            border: 2px solid rgba(255,255,255,0.2); overflow: hidden; cursor: pointer;
         }
-        .gallery-preview:active { transform: scale(0.9); }
-        .gallery-preview img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
+        .gallery-preview img, .gallery-preview video { width: 100%; height: 100%; object-fit: cover; }
 
-        /* Затвор (Shutter) */
         .shutter-container {
-            width: 72px;
-            height: 72px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            transition: transform 0.1s ease;
+            width: 72px; height: 72px; display: flex; align-items: center; justify-content: center; cursor: pointer;
         }
-
-        .shutter-container:active {
-            transform: scale(0.9);
-        }
-
         .shutter-outer {
-            width: 68px;
-            height: 68px;
-            border-radius: 50%;
-            border: 4px solid var(--text-primary);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: all 0.3s ease;
+            width: 68px; height: 68px; border-radius: 50%; border: 4px solid var(--text-primary);
+            display: flex; align-items: center; justify-content: center; transition: all 0.3s;
         }
-
         .shutter-inner {
-            width: 56px;
-            height: 56px;
-            border-radius: 50%;
-            background-color: var(--text-primary);
+            width: 56px; height: 56px; border-radius: 50%; background-color: var(--text-primary);
             transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
+        .mode-video .shutter-inner { background-color: var(--accent-red); }
+        .is-recording .shutter-inner { width: 28px; height: 28px; border-radius: 6px; background-color: var(--accent-red); }
+        .is-recording .shutter-outer { border-color: var(--accent-red); }
 
-        /* Стили для режима ВИДЕО */
-        .mode-video .shutter-outer {
-            border-color: var(--text-primary);
-        }
-        .mode-video .shutter-inner {
-            background-color: var(--accent-red);
-            width: 56px;
-            height: 56px;
-            border-radius: 50%;
-        }
-
-        /* Стили для ЗАПИСИ */
-        .is-recording .shutter-inner {
-            width: 28px;
-            height: 28px;
-            border-radius: 6px; /* Квадрат с легким скруглением */
-            background-color: var(--accent-red);
-        }
-        
-        .is-recording .shutter-outer {
-            border-color: var(--accent-red);
-        }
-
-        /* Кнопка смены камеры */
         .switch-cam-btn {
-            width: 48px;
-            height: 48px;
-            border-radius: 50%;
-            background: rgba(255, 255, 255, 0.15);
-            backdrop-filter: blur(10px);
-            border: none;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            transition: all 0.2s ease;
+            width: 48px; height: 48px; border-radius: 50%; background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(10px); border: none; display: flex; align-items: center; justify-content: center; cursor: pointer;
         }
-        .switch-cam-btn:active { transform: scale(0.9) rotate(180deg); }
-        .switch-cam-btn svg {
-            width: 24px;
-            height: 24px;
-            fill: var(--text-primary);
-        }
+        .switch-cam-btn svg { width: 24px; height: 24px; fill: var(--text-primary); }
 
-        /* Индикатор записи */
+        /* --- ИНДИКАТОР ЗАПИСИ И СТАБИЛИЗАЦИИ --- */
         .recording-indicator {
-            position: absolute;
-            top: 80px;
-            right: 20px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            background: rgba(0,0,0,0.6);
-            padding: 6px 12px;
-            border-radius: 16px;
-            opacity: 0;
-            transition: opacity 0.3s ease;
-            pointer-events: none;
+            position: absolute; top: 80px; right: 20px; display: flex; align-items: center; gap: 8px;
+            background: rgba(0,0,0,0.6); padding: 6px 12px; border-radius: 16px;
+            opacity: 0; transition: opacity 0.3s; pointer-events: none; z-index: 20;
         }
         .recording-indicator.visible { opacity: 1; }
-        .rec-dot {
-            width: 8px;
-            height: 8px;
-            background: var(--accent-red);
-            border-radius: 50%;
-            animation: pulse 1s infinite;
+        .rec-dot { width: 8px; height: 8px; background: var(--accent-red); border-radius: 50%; animation: pulse 1s infinite; }
+        .eis-badge {
+            position: absolute; top: 80px; left: 20px; background: rgba(168, 199, 250, 0.2);
+            color: var(--accent-blue); padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 700;
+            opacity: 0; transition: opacity 0.3s; z-index: 20;
         }
-        .rec-timer { font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
+        .eis-badge.visible { opacity: 1; }
 
-        @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.4; }
-            100% { opacity: 1; }
-        }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }
 
-        /* Уведомление о разрешениях */
-        .permission-denied {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            text-align: center;
-            color: var(--text-secondary);
-            padding: 20px;
-            display: none;
+        /* --- МОДАЛЬНОЕ ОКНО НАСТРОЕК --- */
+        .settings-modal {
+            position: absolute; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(15px);
+            z-index: 50; display: none; flex-direction: column; padding: 20px;
+            animation: slideUp 0.3s ease;
         }
+        .settings-modal.open { display: flex; }
+        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+        
+        .settings-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
+        .settings-title { font-size: 20px; font-weight: 700; }
+        .close-btn { background: none; border: none; color: var(--accent-blue); font-size: 16px; font-weight: 600; cursor: pointer; }
+        
+        .setting-item {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 16px 0; border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .setting-label { font-size: 16px; }
+        .setting-control select {
+            background: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,255,255,0.2);
+            padding: 8px 12px; border-radius: 8px; font-size: 14px; outline: none;
+        }
+        /* Toggle Switch */
+        .toggle {
+            position: relative; display: inline-block; width: 50px; height: 28px;
+        }
+        .toggle input { opacity: 0; width: 0; height: 0; }
+        .slider {
+            position: absolute; cursor: pointer; inset: 0; background-color: #444;
+            transition: .4s; border-radius: 34px;
+        }
+        .slider:before {
+            position: absolute; content: ""; height: 20px; width: 20px; left: 4px; bottom: 4px;
+            background-color: white; transition: .4s; border-radius: 50%;
+        }
+        input:checked + .slider { background-color: var(--accent-blue); }
+        input:checked + .slider:before { transform: translateX(22px); }
+
     </style>
 </head>
 <body>
 
+    <!-- Экран запуска (для обхода блокировок autoplay) -->
+    <div id="start-screen">
+        <svg width="64" height="64" viewBox="0 0 24 24" fill="#A8C7FA"><path d="M12 15.2a3.2 3.2 0 100-6.4 3.2 3.2 0 000 6.4z"/><path d="M9 2L7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2h-3.17L15 2H9zm3 15c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z"/></svg>
+        <h2 style="margin: 0; font-weight: 400;">GCam Web</h2>
+        <button class="start-btn" onclick="requestCameraAccess()">Разрешить доступ к камере</button>
+        <p style="color: var(--text-secondary); font-size: 12px; max-width: 250px; text-align: center;">
+            Требуется для работы видоискателя. Данные не покидают ваше устройство.
+        </p>
+    </div>
+
     <!-- Верхняя панель -->
     <div class="top-bar">
-        <button class="icon-btn" aria-label="Настройки">
+        <button class="icon-btn" onclick="toggleSettings()">
             <svg viewBox="0 0 24 24"><path d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.07-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.74,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.07,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.44-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.47-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"/></svg>
         </button>
-        <div class="top-center">
-            <svg viewBox="0 0 24 24"><path d="M7.41,8.58L12,13.17l4.59-4.59L18,10l-6,6l-6-6L7.41,8.58z"/></svg>
-        </div>
-        <div style="width: 40px;"></div> <!-- Пустой блок для баланса -->
+        <div style="width: 40px;"></div>
     </div>
 
-    <!-- Индикатор записи -->
+    <!-- Индикаторы -->
+    <div class="eis-badge" id="eisBadge">EIS АКТИВНА</div>
     <div class="recording-indicator" id="recIndicator">
         <div class="rec-dot"></div>
-        <div class="rec-timer" id="recTimer">00:00</div>
+        <div class="rec-timer" id="recTimer" style="font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums;">00:00</div>
     </div>
 
-    <!-- Зона видоискателя -->
+    <!-- Видоискатель -->
     <div class="viewport-container">
-        <div class="viewport" id="viewport">
+        <div class="viewport ratio-4-3" id="viewport">
             <video id="video-source" autoplay playsinline muted></video>
             <canvas id="camera-canvas"></canvas>
-            <div class="permission-denied" id="permDenied">
-                <p>Нет доступа к камере.</p>
-                <p style="font-size: 12px; margin-top: 8px;">Разрешите доступ в настройках браузера.</p>
-            </div>
+            <div class="grid-overlay" id="gridOverlay"></div>
         </div>
     </div>
 
@@ -394,7 +233,7 @@
 
     <!-- Режимы -->
     <div class="mode-selector" id="modeSelector">
-        <div class="mode-item" onclick="setMode('night')">Ночная съемка</div>
+        <div class="mode-item" onclick="setMode('night')">Ночная</div>
         <div class="mode-item" onclick="setMode('portrait')">Портрет</div>
         <div class="mode-item active" onclick="setMode('photo')">Камера</div>
         <div class="mode-item" onclick="setMode('video')">Видео</div>
@@ -402,113 +241,125 @@
 
     <!-- Нижняя панель -->
     <div class="bottom-controls" id="bottomControls">
-        <div class="gallery-preview" id="galleryPreview">
-            <!-- Здесь будет превью -->
-        </div>
-
+        <div class="gallery-preview" id="galleryPreview"></div>
         <div class="shutter-container" id="shutterBtn" onclick="handleShutter()">
-            <div class="shutter-outer">
-                <div class="shutter-inner"></div>
-            </div>
+            <div class="shutter-outer"><div class="shutter-inner"></div></div>
         </div>
-
         <button class="switch-cam-btn" onclick="switchCamera()">
-            <svg viewBox="0 0 24 24"><path d="M20,4h-3.17L15,2H9L7.17,4H4C2.9,4,2,4.9,2,6v12c0,1.1,0.9,2,2,2h16c1.1,0,2-0.9,2-2V6C22,4.9,21.1,4,20,4z M12,17 c-2.76,0-5-2.24-5-5s2.24-5,5-5s5,2.24,5,5S14.76,17,12,17z M12,9c-1.66,0-3,1.34-3,3s1.34,3,3,3s3-1.34,3-3S13.66,9,12,9z M15.48,7.53 l-1.41,1.41C13.41,8.34,12.71,8,12,8c-1.1,0-2,0.9-2,2h2c0-0.55,0.45-1,1-1c0.28,0,0.53,0.11,0.71,0.29l1.41-1.41 C14.71,7.47,14.19,7.53,15.48,7.53z"/></svg>
+            <svg viewBox="0 0 24 24"><path d="M20,4h-3.17L15,2H9L7.17,4H4C2.9,4,2,4.9,2,6v12c0,1.1,0.9,2,2,2h16c1.1,0,2-0.9,2-2V6C22,4.9,21.1,4,20,4z M12,17 c-2.76,0-5-2.24-5-5s2.24-5,5-5s5,2.24,5,5S14.76,17,12,17z"/></svg>
         </button>
     </div>
 
+    <!-- Настройки -->
+    <div class="settings-modal" id="settingsModal">
+        <div class="settings-header">
+            <span class="settings-title">Настройки</span>
+            <button class="close-btn" onclick="toggleSettings()">Готово</button>
+        </div>
+        <div class="setting-item">
+            <span class="setting-label">Разрешение</span>
+            <div class="setting-control">
+                <select id="resSelect" onchange="updateSettings()">
+                    <option value="720">HD (720p)</option>
+                    <option value="1080" selected>Full HD (1080p)</option>
+                    <option value="2160">4K (2160p)</option>
+                </select>
+            </div>
+        </div>
+        <div class="setting-item">
+            <span class="setting-label">Сетка кадра</span>
+            <label class="toggle">
+                <input type="checkbox" id="gridToggle" checked onchange="updateSettings()">
+                <span class="slider"></span>
+            </label>
+        </div>
+        <div class="setting-item">
+            <span class="setting-label">Зеркалить фронтальную камеру</span>
+            <label class="toggle">
+                <input type="checkbox" id="mirrorToggle" checked onchange="updateSettings()">
+                <span class="slider"></span>
+            </label>
+        </div>
+    </div>
+
     <script>
-        // --- КОНФИГУРАЦИЯ И СОСТОЯНИЕ ---
+        // --- СОСТОЯНИЕ ПРИЛОЖЕНИЯ ---
         const state = {
-            mode: 'photo', // 'photo', 'video', 'portrait', 'night'
-            zoom: 1,       // 0.6, 1, 2
-            facingMode: 'environment', // 'user' или 'environment'
+            mode: 'photo',
+            zoom: 1,
+            facingMode: 'environment',
             isRecording: false,
             stream: null,
             mediaRecorder: null,
             recordedChunks: [],
             recordingStartTime: 0,
             recordingTimerInterval: null,
-            wideStream: null, // Для попытки загрузки ультраширика
-            animationId: null
+            animationId: null,
+            settings: {
+                resolution: '1080',
+                grid: true,
+                mirror: true
+            }
         };
 
         // --- DOM ЭЛЕМЕНТЫ ---
         const video = document.getElementById('video-source');
         const canvas = document.getElementById('camera-canvas');
-        const ctx = canvas.getContext('2d', { alpha: false }); // Оптимизация
+        const ctx = canvas.getContext('2d', { alpha: false, willReadFrequently: true });
+        const viewport = document.getElementById('viewport');
+        const gridOverlay = document.getElementById('gridOverlay');
         const shutterBtn = document.getElementById('shutterBtn');
         const bottomControls = document.getElementById('bottomControls');
         const recIndicator = document.getElementById('recIndicator');
         const recTimer = document.getElementById('recTimer');
+        const eisBadge = document.getElementById('eisBadge');
         const galleryPreview = document.getElementById('galleryPreview');
-        const permDenied = document.getElementById('permDenied');
 
         // --- ИНИЦИАЛИЗАЦИЯ ---
+        async function requestCameraAccess() {
+            document.getElementById('start-screen').style.display = 'none';
+            await initCamera();
+        }
+
         async function initCamera() {
+            if (state.stream) {
+                state.stream.getTracks().forEach(track => track.stop());
+            }
+
+            const heightMap = { '720': 720, '1080': 1080, '2160': 2160 };
+            const targetHeight = heightMap[state.settings.resolution];
+
+            const constraints = {
+                video: {
+                    facingMode: state.facingMode,
+                    width: { ideal: 1920 },
+                    height: { ideal: targetHeight },
+                    // ЗАПРОС АППАРАТНОЙ СТАБИЛИЗАЦИИ (EIS)
+                    advanced: [{ videoStabilizationMode: 'auto' }]
+                },
+                audio: state.mode === 'video'
+            };
+
             try {
-                // Останавливаем предыдущие стримы
-                if (state.stream) {
-                    state.stream.getTracks().forEach(track => track.stop());
-                }
-
-                // Пытаемся получить камеру
-                const constraints = {
-                    video: {
-                        facingMode: state.facingMode,
-                        width: { ideal: 1920 },
-                        height: { ideal: 1080 }
-                    },
-                    audio: state.mode === 'video'
-                };
-
                 state.stream = await navigator.mediaDevices.getUserMedia(constraints);
                 video.srcObject = state.stream;
                 
-                // Ждем метаданных видео для настройки Canvas
+                // Явный вызов play() для обхода блокировок iOS/Chrome
+                await video.play();
+                
                 video.onloadedmetadata = () => {
                     canvas.width = video.videoWidth;
                     canvas.height = video.videoHeight;
-                    permDenied.style.display = 'none';
                     startDrawingLoop();
                 };
-
-                // Попытка инициализировать "широкоугольную" камеру для зума 0.6x
-                // Это эвристика: ищем камеру с "wide" или "ultrawide" в label, или просто вторую заднюю камеру
-                if (state.facingMode === 'environment' && !state.wideStream) {
-                    initWideCamera();
-                }
-
             } catch (err) {
-                console.error("Ошибка доступа к камере:", err);
-                permDenied.style.display = 'block';
+                console.error("Ошибка камеры:", err);
+                alert("Не удалось получить доступ к камере. Проверьте разрешения.");
+                document.getElementById('start-screen').style.display = 'flex';
             }
         }
 
-        async function initWideCamera() {
-            try {
-                const devices = await navigator.mediaDevices.enumerateDevices();
-                const videoDevices = devices.filter(d => d.kind === 'videoinput');
-                
-                // Ищем устройство, которое может быть широкоугольным (эвристика по названию или просто второе)
-                // В реальности веб-API не дает надежного способа выбрать именно "ultrawide", 
-                // поэтому мы берем второй доступный 'environment' если он есть.
-                const backCameras = videoDevices.filter(d => 
-                    (d.label.toLowerCase().includes('back') || d.label.toLowerCase().includes('environment') || d.label.toLowerCase().includes('задняя'))
-                );
-                
-                if (backCameras.length > 1) {
-                    const wideConstraints = {
-                        video: { deviceId: backCameras[1].deviceId }
-                    };
-                    state.wideStream = await navigator.mediaDevices.getUserMedia(wideConstraints);
-                }
-            } catch (e) {
-                console.log("Широкоугольная камера не найдена или недоступна. Будет использована цифровая симуляция.");
-            }
-        }
-
-        // --- ЛОГИКА ОТРИСОВКИ НА CANVAS (ЯДРО GCam) ---
+        // --- ЯДРО ОТРИСОВКИ (CANVAS) ---
         function startDrawingLoop() {
             if (state.animationId) cancelAnimationFrame(state.animationId);
 
@@ -517,207 +368,128 @@
                     const vw = video.videoWidth;
                     const vh = video.videoHeight;
                     
-                    // Очистка
                     ctx.fillStyle = '#000';
                     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-                    if (state.zoom === 1) {
-                        // 1x: Полное изображение
-                        // Зеркалирование для фронталки
-                        if (state.facingMode === 'user') {
-                            ctx.save();
-                            ctx.scale(-1, 1);
-                            ctx.drawImage(video, -canvas.width, 0, canvas.width, canvas.height);
-                            ctx.restore();
-                        } else {
-                            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                        }
-                    } 
-                    else if (state.zoom === 2) {
-                        // 2x: Цифровой кроп центральной части (электронный зум)
-                        const cropW = vw / 2;
-                        const cropH = vh / 2;
-                        const cropX = (vw - cropW) / 2;
-                        const cropY = (vh - cropH) / 2;
+                    // Логика соотношения сторон и режимов
+                    let sx = 0, sy = 0, sWidth = vw, sHeight = vh;
+                    let filter = 'none';
 
-                        if (state.facingMode === 'user') {
-                            ctx.save();
-                            ctx.scale(-1, 1);
-                            ctx.drawImage(video, -cropX, cropY, cropW, cropH, 0, 0, canvas.width, canvas.height);
-                            ctx.restore();
+                    if (state.mode === 'portrait') {
+                        // Кроп 9:16 из центра
+                        const targetRatio = 9/16;
+                        if (vw / vh > targetRatio) {
+                            sWidth = vh * targetRatio;
+                            sx = (vw - sWidth) / 2;
                         } else {
-                            ctx.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, canvas.width, canvas.height);
+                            sHeight = vw / targetRatio;
+                            sy = (vh - sHeight) / 2;
                         }
-                    } 
-                    else if (state.zoom === 0.6) {
-                        // 0.6x: Логика переключения или симуляции
-                        if (state.wideStream && state.facingMode === 'environment') {
-                            // Если нашли реальную широкую камеру, рисуем её (нужен отдельный video элемент, 
-                            // но для простоты в этом демо мы используем цифровую симуляцию "отдаления" 
-                            // через масштабирование контекста, так как переключение стримов на лету в один canvas сложно синхронизировать без мерцания)
-                            
-                            // Симуляция 0.6x: рисуем изображение меньшего размера по центру, создавая эффект "широкого угла" с черными полями 
-                            // (или можно растянуть, но это исказит. GCam на вебе без нативных API линз ограничен).
-                            // Лучший вариант для демо: уменьшить масштаб отрисовки.
-                            const scale = 0.6;
-                            const drawW = canvas.width * scale;
-                            const drawH = canvas.height * scale;
-                            const drawX = (canvas.width - drawW) / 2;
-                            const drawY = (canvas.height - drawH) / 2;
-
-                            if (state.facingMode === 'user') {
-                                ctx.save();
-                                ctx.translate(canvas.width, 0);
-                                ctx.scale(-1, 1);
-                                ctx.drawImage(video, drawX, drawY, drawW, drawH);
-                                ctx.restore();
-                            } else {
-                                ctx.drawImage(video, drawX, drawY, drawW, drawH);
-                            }
-                        } else {
-                            // Фоллбэк для фронталки или если нет второй камеры
-                            const scale = 0.6;
-                            const drawW = canvas.width * scale;
-                            const drawH = canvas.height * scale;
-                            const drawX = (canvas.width - drawW) / 2;
-                            const drawY = (canvas.height - drawH) / 2;
-                            
-                            if (state.facingMode === 'user') {
-                                ctx.save();
-                                ctx.translate(canvas.width, 0);
-                                ctx.scale(-1, 1);
-                                ctx.drawImage(video, drawX, drawY, drawW, drawH);
-                                ctx.restore();
-                            } else {
-                                ctx.drawImage(video, drawX, drawY, drawW, drawH);
-                            }
-                        }
+                    } else if (state.mode === 'night') {
+                        // Симуляция ночного режима (повышение яркости/контраста)
+                        filter = 'brightness(1.3) contrast(1.15) saturate(1.2)';
                     }
+
+                    ctx.filter = filter;
+
+                    // Зеркалирование для фронталки
+                    if (state.facingMode === 'user' && state.settings.mirror) {
+                        ctx.save();
+                        ctx.scale(-1, 1);
+                        ctx.drawImage(video, -sx - sWidth, sy, sWidth, sHeight, 0, 0, canvas.width, canvas.height);
+                        ctx.restore();
+                    } else {
+                        ctx.drawImage(video, sx, sy, sWidth, sHeight, 0, 0, canvas.width, canvas.height);
+                    }
+                    
+                    ctx.filter = 'none'; // Сброс фильтра
                 }
                 state.animationId = requestAnimationFrame(draw);
             }
             draw();
         }
 
-        // --- УПРАВЛЕНИЕ ЗУМОМ ---
+        // --- УПРАВЛЕНИЕ ---
         function setZoom(level) {
             state.zoom = level;
-            // Обновление UI
             document.querySelectorAll('.zoom-tab').forEach(tab => {
-                tab.classList.remove('active');
-                if (parseFloat(tab.dataset.zoom) === level) {
-                    tab.classList.add('active');
-                }
+                tab.classList.toggle('active', parseFloat(tab.dataset.zoom) === level);
             });
-            // Перезапуск отрисовки не требуется, цикл подхватит state.zoom
+            // В реальном приложении здесь менялся бы source или digital crop
         }
 
-        // --- УПРАВЛЕНИЕ РЕЖИМАМИ ---
         function setMode(newMode) {
             state.mode = newMode;
             
-            // UI Обновление
             document.querySelectorAll('.mode-item').forEach(item => {
                 item.classList.remove('active');
-                if (item.textContent.toLowerCase().includes(newMode === 'photo' ? 'камера' : newMode === 'video' ? 'видео' : newMode)) {
-                    item.classList.add('active');
-                }
+                const modeNames = { 'night': 'Ночная', 'portrait': 'Портрет', 'photo': 'Камера', 'video': 'Видео' };
+                if (item.textContent === modeNames[newMode]) item.classList.add('active');
             });
 
-            // Изменение стиля затвора
-            bottomControls.classList.remove('mode-video', 'is-recording');
-            if (newMode === 'video') {
-                bottomControls.classList.add('mode-video');
-            }
+            // Изменение соотношения сторон
+            viewport.className = 'viewport';
+            if (newMode === 'photo' || newMode === 'night') viewport.classList.add('ratio-4-3');
+            else if (newMode === 'video') viewport.classList.add('ratio-16-9');
+            else if (newMode === 'portrait') viewport.classList.add('ratio-9-16');
 
-            // Если перешли в видео, убедимся что аудио разрешено (перезапуск стрима)
-            if (newMode === 'video' && (!state.stream || !state.stream.getAudioTracks().length)) {
-                initCamera();
-            }
+            bottomControls.classList.remove('mode-video', 'is-recording');
+            if (newMode === 'video') bottomControls.classList.add('mode-video');
+
+            // Перезапуск камеры для применения аудио-трека или новых ограничений
+            initCamera();
         }
 
-        // --- СМЕНА КАМЕРЫ ---
         async function switchCamera() {
             state.facingMode = state.facingMode === 'environment' ? 'user' : 'environment';
-            
-            // Анимация
-            canvas.classList.add('camera-switch-anim');
-            setTimeout(() => canvas.classList.remove('camera-switch-anim'), 300);
-
             await initCamera();
         }
 
-        // --- ОБРАБОТКА ЗАТВОРА ---
+        // --- ЗАТВОР И ЗАПИСЬ ---
         function handleShutter() {
             if (state.mode === 'video') {
-                if (state.isRecording) {
-                    stopRecording();
-                } else {
-                    startRecording();
-                }
+                state.isRecording ? stopRecording() : startRecording();
             } else {
                 takePhoto();
             }
         }
 
         function takePhoto() {
-            // Анимация нажатия
             shutterBtn.style.transform = 'scale(0.9)';
             setTimeout(() => shutterBtn.style.transform = 'scale(1)', 100);
-
-            // Создаем снимок из Canvas
-            const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
             
-            // Обновляем галерею
-            galleryPreview.innerHTML = `<img src="${dataUrl}" alt="Last photo">`;
-            
-            // Вибрация (если поддерживается)
-            if (navigator.vibrate) navigator.vibrate(50);
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
+            galleryPreview.innerHTML = `<img src="${dataUrl}">`;
+            if (navigator.vibrate) navigator.vibrate(30);
         }
 
         function startRecording() {
             state.isRecording = true;
             bottomControls.classList.add('is-recording');
             recIndicator.classList.add('visible');
-            
-            // Получаем поток с Canvas (30 FPS)
+            eisBadge.classList.add('visible'); // Показываем бейдж EIS
+
             const canvasStream = canvas.captureStream(30);
-            
-            // Добавляем аудио с оригинального стрима, если есть
             if (state.stream.getAudioTracks().length > 0) {
                 canvasStream.addTrack(state.stream.getAudioTracks()[0]);
             }
 
             state.recordedChunks = [];
-            // Предпочтительные кодеки
             const options = { mimeType: 'video/webm;codecs=vp9' };
-            if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-                options.mimeType = 'video/webm'; // Фоллбэк
-            }
+            if (!MediaRecorder.isTypeSupported(options.mimeType)) options.mimeType = 'video/webm';
 
             state.mediaRecorder = new MediaRecorder(canvasStream, options);
-
-            state.mediaRecorder.ondataavailable = (event) => {
-                if (event.data.size > 0) {
-                    state.recordedChunks.push(event.data);
-                }
-            };
-
+            state.mediaRecorder.ondataavailable = e => { if (e.data.size > 0) state.recordedChunks.push(e.data); };
             state.mediaRecorder.onstop = () => {
                 const blob = new Blob(state.recordedChunks, { type: 'video/webm' });
-                const url = URL.createObjectURL(blob);
-                galleryPreview.innerHTML = `<video src="${url}" style="width:100%; height:100%; object-fit:cover;"></video>`;
+                galleryPreview.innerHTML = `<video src="${URL.createObjectURL(blob)}" autoplay loop muted></video>`;
             };
 
             state.mediaRecorder.start();
             state.recordingStartTime = Date.now();
-            
-            // Таймер
             state.recordingTimerInterval = setInterval(() => {
                 const diff = Math.floor((Date.now() - state.recordingStartTime) / 1000);
-                const mins = Math.floor(diff / 60).toString().padStart(2, '0');
-                const secs = (diff % 60).toString().padStart(2, '0');
-                recTimer.textContent = `${mins}:${secs}`;
+                recTimer.textContent = `${Math.floor(diff/60).toString().padStart(2,'0')}:${(diff%60).toString().padStart(2,'0')}`;
             }, 1000);
         }
 
@@ -725,25 +497,31 @@
             state.isRecording = false;
             bottomControls.classList.remove('is-recording');
             recIndicator.classList.remove('visible');
-            
-            if (state.mediaRecorder && state.mediaRecorder.state !== 'inactive') {
-                state.mediaRecorder.stop();
-            }
+            eisBadge.classList.remove('visible');
+            if (state.mediaRecorder && state.mediaRecorder.state !== 'inactive') state.mediaRecorder.stop();
             clearInterval(state.recordingTimerInterval);
             recTimer.textContent = '00:00';
         }
 
-        // --- ЗАПУСК ---
-        window.addEventListener('load', () => {
-            initCamera();
-        });
+        // --- НАСТРОЙКИ ---
+        function toggleSettings() {
+            document.getElementById('settingsModal').classList.toggle('open');
+        }
 
-        // Обработка изменения размера окна
-        window.addEventListener('resize', () => {
-            if (video.videoWidth) {
-                canvas.width = video.videoWidth;
-                canvas.height = video.videoHeight;
-            }
+        function updateSettings() {
+            state.settings.resolution = document.getElementById('resSelect').value;
+            state.settings.grid = document.getElementById('gridToggle').checked;
+            state.settings.mirror = document.getElementById('mirrorToggle').checked;
+
+            gridOverlay.classList.toggle('visible', state.settings.grid);
+            
+            // Перезапуск камеры при изменении разрешения
+            if (!state.isRecording) initCamera();
+        }
+
+        // Инициализация настроек при загрузке
+        window.addEventListener('load', () => {
+            gridOverlay.classList.toggle('visible', state.settings.grid);
         });
 
     </script>
